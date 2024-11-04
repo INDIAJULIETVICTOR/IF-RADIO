@@ -49,7 +49,7 @@ The user interface will open, displaying the main radio controls such as RF Gain
 
 ## Credits
 
-This project was developed by [your name]. Contributions are welcome!
+This project was developed by IU0IJV. Contributions are welcome!
 
 ## License
 
