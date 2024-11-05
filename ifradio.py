@@ -42,11 +42,21 @@ COMMAND_GET_FREQUENCY = 0x03    # Comando per leggere la frequenza
 COMMAND_SET_MODE = 0x06         # Comando per impostare la modalità operativa
 COMMAND_SET_SQUELCH = 0x14      # Comando per impostare lo squelch
 COMMAND_GET_SQUELCH = 0x15      # Comando per leggere il livello dello squelch
-COMMAND_SET_MONITOR = 0X1A
-COMMAND_SET_AGC = 0
+COMMAND_SET_AGC = 0x16          # Comando per impostare il tipo di AGC
+COMMAND_GET_RSSI = 0x19         # Comando per ottenere il valore dello S-meter
+COMMAND_SET_MONITOR = 0x1A      # comando per attivare o disattivare la funzioen monitor
+COMMAND_SET_RFGAIN = 0x1C       # comando per settare il valore di RFGain
+COMMAND_GET_RFGAIN = 0x1D       # comando per settare il valore di RFGain
+
+
 COMMAND_SET_STEP = 0
 COMMAND_SET_SCAN = 0
-COMMAND_SET_RFGAIN = 0
+
+AGC_AUTO = 0
+AGC_MAN = 1
+AGC_SLOW = 2
+AGC_NOR = 3
+AGC_FAST = 4
 
 MODE_AM = 0x00                  # Codice per AM
 MODE_FM = 0x01                  # Codice per FM
@@ -65,14 +75,20 @@ _style_code_ran = 0
 altezzavfo = 56
 
 # Configurazione della porta seriale
-ser = serial.Serial(
-    port='COM11',               # Modifica con la porta corretta
-    baudrate=19200,
-    bytesize=serial.EIGHTBITS,
-    parity=serial.PARITY_NONE,
-    stopbits=serial.STOPBITS_ONE,
-    timeout=5
-)
+try:
+    ser = serial.Serial(
+        port='COM11',               # Modifica con la porta corretta
+        baudrate=115200,
+        bytesize=serial.EIGHTBITS,
+        parity=serial.PARITY_NONE,
+        stopbits=serial.STOPBITS_ONE,
+        timeout=5
+    )
+except serial.SerialException as e:
+    root = tk.Tk()
+    root.withdraw()  # Nasconde la finestra principale
+    messagebox.showerror("Errore Porta Seriale", f"Impossibile aprire la porta seriale: {e}")
+    sys.exit(1)  # Esci con errore
 
 #-------------------------------------------------------------------------------------------------------------------------
 # Funzioni Threading
@@ -84,6 +100,7 @@ def read_from_port(ser):
             # Leggi tutti i byte disponibili
             data = ser.read(ser.in_waiting)
             response_buffer.extend(data)
+            #print(data)
 
             # Continua a cercare finché non troviamo il byte di terminazione (CI-V END BYTE)
             while CIV_END_BYTE in response_buffer:
@@ -142,6 +159,23 @@ def process_civ_message(message):
             # Chiamata al metodo di aggiornamento dello squelch usando l'istanza singleton
             root.after(0, Toplevel1.instance.update_squelch_display, squelch_level)
 
+        # Aggiorna lo smeter con il segnale ricevuto
+        # -----------------------------------------------------------------------------
+        elif command == COMMAND_GET_RSSI and len(data) > 0:
+            smeter_level = data[0]
+            # print(smeter_level);
+            # Chiamata al metodo di aggiornamento dello squelch usando l'istanza singleton
+            root.after(0, Toplevel1.instance.update_smeter, smeter_level)
+
+        # Aggiorna controllo rfgain
+        # -----------------------------------------------------------------------------
+        elif command == COMMAND_GET_RFGAIN and len(data) > 0:
+            gain_level = data[0]
+            # print(gain_level);
+            # Chiamata al metodo di aggiornamento dello squelch usando l'istanza singleton
+            root.after(0, Toplevel1.instance.update_rfgain, gain_level)
+
+
     except Exception as e:
         print(f"Errore durante l'elaborazione del messaggio CI-V: {e}")
 
@@ -184,7 +218,7 @@ def set_mode(mode):
     send_command(COMMAND_SET_MODE, [mode])
 
 def set_rfgain(val):
-    send_command(COMMAND_SET_MODE, [val])
+    send_command(COMMAND_SET_RFGAIN, [val])
 
 def set_monitor():
     data = [0x00, 0x01]
@@ -208,6 +242,9 @@ def get_frequency():
 
 def get_squelch():
     send_command(COMMAND_GET_SQUELCH)
+
+def get_rfgain():
+    send_command(COMMAND_GET_RFGAIN)
 
 def periodic_update():
     get_frequency()
@@ -622,9 +659,18 @@ class Toplevel1:
         formatted_frequency = f"{int(frequency_str):,}".replace(",", ".")
         self.VfoA.config(text=formatted_frequency)
 
+    def update_rfgain(self, gain_level):
+        # Aggiorna la visualizzazione dell'RF Gain
+        self.RfGain.set(gain_level)
+
     def update_squelch_display(self, squelch_level):
         # Aggiorna la visualizzazione dello squelch
         self.Squelch.set(squelch_level)
+
+    def update_smeter(self, smeter_level):
+        # Aggiorna la visualizzazione dello S-meter
+        self.smeter["value"] = smeter_level
+
 
 #-------------------------------------------------------------------------------------------------------------------------
 # 
@@ -639,6 +685,8 @@ if __name__ == "__main__":
     serial_thread = threading.Thread(target=read_from_port, args=(ser,), daemon=True)
     serial_thread.start()
 
-    root.after(500, periodic_update)
+    root.after(500, get_frequency())
+    root.after(600, get_squelch())
+    root.after(700, get_rfgain())
   
     root.mainloop()
