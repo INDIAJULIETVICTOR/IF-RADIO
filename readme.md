@@ -2,6 +2,9 @@
 
 This project represents a front panel for an IF radio application, developed using Python and Tkinter for the graphical user interface. The application allows users to interact with a radio device, display information such as frequency and signal level, and control various radio functions.
 
+<img src="images/ifradio.png" alt="Board X" style="display: block; margin-left: auto; margin-right: auto; width: 50%;">
+
+
 ## Features
 
 - Real-time frequency display.
