@@ -34,7 +34,7 @@ This project represents a front panel for an IF radio application, developed usi
 To start the radio front panel, run the following command:
 
 ```bash
-python main.py
+python ifradio.py
 ```
 
 The user interface will open, displaying the main radio controls such as RF Gain, Squelch, signal display, and more.
