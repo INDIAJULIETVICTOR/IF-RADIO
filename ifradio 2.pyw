@@ -170,11 +170,11 @@ def process_civ_message(message):
 
         # Aggiorna il display della frequenza quando si riceve il comando GET_FREQUENCY
         # -----------------------------------------------------------------------------
-        if command == COMMAND_GET_FREQUENCY and len(data) == 5:
+        if command == COMMAND_GET_FREQUENCY and len(data) > 0:
             
             # Decodifica la frequenza dai dati BCD ricevuti (da LSB a MSB)
             frequency = 0
-            for i in range(5):
+            for i in range(len(data)):
                 high_nibble = (data[i] >> 4) & 0x0F
                 low_nibble = data[i] & 0x0F
                 frequency = (frequency * 100) + (high_nibble * 10) + low_nibble
@@ -237,16 +237,18 @@ def set_frequency(frequency):
     Funzione per impostare la frequenza sulla radio secondo il protocollo CI-V.
     La frequenza deve essere passata in Hz.
     """
-    # Convertire la frequenza in una stringa di 8 cifre per garantire il formato BCD
-    frequency_str = f"{frequency:08d}"  # Assicura 8 cifre (es. 7410000 diventa 07410000)
-    data = [0x00] * 5  # Inizializza i 5 byte per i dati
+    # Convertire la frequenza in una stringa di 10 cifre per garantire il formato BCD
+    frequency_str = f"{frequency:010d}"  # Assicura 10 cifre (es. 7410000 diventa 0007410000)
+    data = [0x00] * 6  # Inizializza i 6 byte per i dati
 
     # Riempire i byte BCD secondo l'ordine specifico
-    data[0] = (int(frequency_str[7]) << 4) | int(frequency_str[6])  # Byte 1: 10 Hz e 1 Hz
-    data[1] = (int(frequency_str[5]) << 4) | int(frequency_str[4])  # Byte 2: 100 Hz e 1 kHz
-    data[2] = (int(frequency_str[3]) << 4) | int(frequency_str[2])  # Byte 3: 10 kHz e 100 kHz
-    data[3] = (int(frequency_str[1]) << 4) | int(frequency_str[0])  # Byte 4: 1 MHz e 10 MHz
-    data[4] = 0x00  # Byte 5: 1 GHz (fisso a 0) e 100 MHz (fisso a 0 per valori sotto 100 MHz)
+    data[0] = (int(frequency_str[8]) << 4) | int(frequency_str[9])  # Byte 1: 10 Hz e 1 Hz
+    data[1] = (int(frequency_str[6]) << 4) | int(frequency_str[7])  # Byte 2: 100 Hz e 1 kHz
+    data[2] = (int(frequency_str[4]) << 4) | int(frequency_str[5])  # Byte 3: 10 kHz e 100 kHz
+    data[3] = (int(frequency_str[2]) << 4) | int(frequency_str[3])  # Byte 4: 1 MHz e 10 MHz
+    data[4] = (int(frequency_str[0]) << 4) | int(frequency_str[1])  # Byte 5: 100 MHz e 1 GHz
+    data[5] = 0x00                                                  # Byte 6: opzionale, può essere utilizzato per altri scopi se necessario
+
 
     # Invia il comando alla radio
     send_command(COMMAND_SET_FREQUENCY, data)
