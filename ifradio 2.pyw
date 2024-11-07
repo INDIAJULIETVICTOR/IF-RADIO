@@ -242,11 +242,11 @@ def set_frequency(frequency):
     data = [0x00] * 6  # Inizializza i 6 byte per i dati
 
     # Riempire i byte BCD secondo l'ordine specifico
-    data[0] = (int(frequency_str[8]) << 4) | int(frequency_str[9])  # Byte 1: 10 Hz e 1 Hz
-    data[1] = (int(frequency_str[6]) << 4) | int(frequency_str[7])  # Byte 2: 100 Hz e 1 kHz
-    data[2] = (int(frequency_str[4]) << 4) | int(frequency_str[5])  # Byte 3: 10 kHz e 100 kHz
-    data[3] = (int(frequency_str[2]) << 4) | int(frequency_str[3])  # Byte 4: 1 MHz e 10 MHz
-    data[4] = (int(frequency_str[0]) << 4) | int(frequency_str[1])  # Byte 5: 100 MHz e 1 GHz
+    data[0] = (int(frequency_str[9]) << 4) | int(frequency_str[8])  # Byte 1: 10 Hz e 1 Hz
+    data[1] = (int(frequency_str[7]) << 4) | int(frequency_str[6])  # Byte 2: 100 Hz e 1 kHz
+    data[2] = (int(frequency_str[5]) << 4) | int(frequency_str[4])  # Byte 3: 10 kHz e 100 kHz
+    data[3] = (int(frequency_str[3]) << 4) | int(frequency_str[2])  # Byte 4: 1 MHz e 10 MHz
+    data[4] = (int(frequency_str[1]) << 4) | int(frequency_str[0])  # Byte 5: 100 MHz e 1 GHz
     data[5] = 0x00                                                  # Byte 6: opzionale, può essere utilizzato per altri scopi se necessario
 
 
