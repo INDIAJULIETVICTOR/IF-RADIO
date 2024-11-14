@@ -111,7 +111,7 @@ monstat = 0
 try:
     ser = serial.Serial(
         port='COM11',               # Modifica con la porta corretta
-        baudrate=38400,
+        baudrate=115200,
         bytesize=serial.EIGHTBITS,
         parity=serial.PARITY_NONE,
         stopbits=serial.STOPBITS_ONE,
@@ -226,7 +226,7 @@ def process_civ_message(message):
         # Aggiorna lo smeter con il segnale ricevuto
         # -----------------------------------------------------------------------------
         elif command == COMMAND_GET_RSSI and len(data) > 0:
-            smeter_level = data[0]
+            smeter_level = data[0] + data[1]*256
             # print(smeter_level);
             # Chiamata al metodo di aggiornamento dello squelch usando l'istanza singleton
             # root.after(0, Toplevel1.instance.update_smeter, smeter_level)
@@ -1031,11 +1031,11 @@ class SMeter(tk.Frame):
         )
         
         #----------------------------------------------------------- Disegna l'arco verde per la soglia dello squelch
-        squelch_angle = 150 - ((self.squelch_threshold-10) / 255) * 120  # Calcola l'angolo per la soglia dello squelch
-        
-        # Limita l'angolo minimo dell'arco per non superare +60 dB (30 gradi)
-        squelch_angle = max(squelch_angle, 30)
+        squelch_angle = 150 - ((self.squelch_threshold) / 255) * 120  # Calcola l'angolo per la soglia dello squelch
 
+        # Limita l'angolo minimo dell'arco per non superare +60 dB (30 gradi)
+        squelch_angle = max(min(round(squelch_angle), 150), 30)
+        
         self.canvas.create_arc(
             self.center_x - (self.radius - int(30 * self.scale_factor)),
             self.center_y - (self.radius - int(30 * self.scale_factor)),
@@ -1123,11 +1123,11 @@ class SMeter(tk.Frame):
         # Aggiorna il valore in scala S per la visualizzazione
         if smeter_value < 9:
             # Mostra il valore arrotondato per S0-S9
-            self.s_meter_value = f"S{int(round(smeter_value))}"
+            self.s_meter_value = f"{int(round(smeter_value))}"
         else:
             # Dopo S9, utilizza il formato S9+XX per rappresentare +10, +20, ecc.
             increment = int((smeter_value - 9) * 10)
-            self.s_meter_value = f"S9+{increment}"
+            self.s_meter_value = f"9+{increment}"
 
         # Richiama la funzione di smussamento per aggiornare la lancetta in modo graduale
         self.smooth_update_needle(smeter_target_value)
