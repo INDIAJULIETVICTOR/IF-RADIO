@@ -152,49 +152,30 @@ def led_timeout_manager():
 # Thread per la lettura dalla porta seriale
 
 def read_from_port():
-    
     buffer = bytearray()
     global ser
-    global Led_activity_timeout
-    
     while True:
-        if ser and ser.is_open:
-            try:
-                if ser.in_waiting > 0:
-                    # Leggi quanti più byte possibile per aumentare la velocità di lettura
-                    data = ser.read(ser.in_waiting)
-                    buffer.extend(data)
-                    
-                    # Aggiorna il LED a verde ogni volta che arrivano dati
-                    Led_activity_timeout = 5
-
-                    # Continua a elaborare tutti i messaggi completi nel buffer
-                    while 0xFD in buffer:  # 0xFD rappresenta il byte di fine messaggio CI-V
-                        end_index = buffer.index(0xFD)
-
-                        # Estrai il messaggio completo
-                        message = buffer[:end_index + 1]
-
-                        # Verifica che il messaggio sia valido
-                        if len(message) >= 6 and message[0] == 0xFE and message[1] == 0xFE:  # 0xFE rappresenta il byte di inizio messaggio CI-V
-                            data_queue.put(message)
-
-                        # Rimuovi il messaggio elaborato dal buffer
-                        buffer = buffer[end_index + 1:]
-
-            except serial.SerialException as e:
-                print(f"Errore lettura seriale: {e}")
-                break
-            
-        # Riduci al minimo il ritardo per massimizzare la frequenza di lettura
+        try:
+            if ser and ser.is_open:
+                while ser.in_waiting > 0:
+                    data = ser.read(1)  # Legge un byte alla volta
+                    buffer.append(data[0])
+                    if data[0] == 0xFD:  # Terminatore del messaggio
+                        # print(f"Pacchetto ricevuto: {buffer}")
+                        data_queue.put(buffer.copy())  # Aggiunge il pacchetto alla coda
+                        buffer.clear()  # Svuota il buffer per il prossimo pacchetto
+        except serial.SerialException as e:
+            print(f"Errore lettura seriale: {e}")
+        except Exception as e:
+            print(f"Errore generico in read_from_port: {e}")
         time.sleep(0.1)
-            
 
         
 # -----------------------------------------------------------------------------
 # Thread per elaborare i dati dalla coda
 
 def process_data():
+    global Led_activity_timeout
     while True:
         if not data_queue.empty():
             try:
@@ -202,16 +183,17 @@ def process_data():
                 message = data_queue.get_nowait()
                 # Elabora il messaggio CI-V
                 process_civ_message(message)
+                # print(f"Pacchetto elaborato: {message}")
+                Led_activity_timeout = 5
+                
             except queue.Empty:
                 # In questo caso, l'eccezione non dovrebbe mai verificarsi, ma è bene gestirla
+                print ("errore di ricezione dalla coda")
                 pass
-        else:
-            # Se la coda è vuota, riduci il carico sulla CPU con una piccola pausa
-            time.sleep(0.1)
+
+        time.sleep(0.05)
 
 
-# -----------------------------------------------------------------------------
-transmission_enabled = True   # Flag globale per abilitare/disabilitare la trasmissione          
 
 # -----------------------------------------------------------------------------
 # Funzione per elaborare i messaggi CI-V ricevuti
@@ -245,9 +227,8 @@ def process_civ_message(message):
         elif command == COMMAND_GET_SQUELCH and len(data) > 0:
             squelch_level = data[0]
             # Chiamata al metodo di aggiornamento dello squelch usando l'istanza singleton
-            transmission_enabled = False
-            root.after(0, Toplevel1.instance.update_squelch_display, squelch_level)
-            root.after(0, lambda: SMeter.instance.update_squelch_threshold(squelch_level))
+            root.after(10, Toplevel1.instance.update_squelch_display, squelch_level)
+            root.after(20, lambda: SMeter.instance.update_squelch_threshold(squelch_level))
 
 
         # Aggiorna lo smeter con il segnale ricevuto
@@ -257,7 +238,7 @@ def process_civ_message(message):
             # print(smeter_level);
             # Chiamata al metodo di aggiornamento dello squelch usando l'istanza singleton
             # root.after(0, Toplevel1.instance.update_smeter, smeter_level)
-            root.after(0, SMeter.instance.update_smeter, smeter_level)
+            root.after(10, SMeter.instance.update_smeter, smeter_level)
 
         # Aggiorna controllo rfgain
         # -----------------------------------------------------------------------------
@@ -265,21 +246,12 @@ def process_civ_message(message):
             gain_level = data[0]
             # print(gain_level);
             # Chiamata al metodo di aggiornamento dello squelch usando l'istanza singleton
-            transmission_enabled = False
-            root.after(0, Toplevel1.instance.update_rfgain, gain_level)
+            root.after(20, Toplevel1.instance.update_rfgain, gain_level)
 
 
     except Exception as e:
         print(f"Errore durante l'elaborazione del messaggio CI-V: {e}")
 
-    # Riabilita la trasmissione dopo l'aggiornamento
-    root.after(50, enable_transmission)
-    
-
-# Funzione per riabilitare la trasmissione
-def enable_transmission():
-    global transmission_enabled
-    transmission_enabled = True
 
 #-------------------------------------------------------------------------------------------------------------------------
 # Funzioni per l'invio dei comandi alla radio
@@ -376,10 +348,8 @@ def periodic_update():
         get_frequency()
         get_squelch()
         get_rfgain()
-        # root.after(500, periodic_update)
     else:
         print("Porta seriale non aperta. Saltando aggiornamento periodico.")
-
 
 
 def _style_code():
@@ -1270,31 +1240,34 @@ class SMeter(tk.Frame):
             
             
     def smooth_update_needle(self, target_value):
-        # Definizione dei passi per il movimento in avanti e all'indietro
-        step_forward = 10.0  # Passo maggiore per l'avanzamento rapido
-        step_backward = 1  # Passo minore per il ritorno lento
+        # Fattore di easing per movimento fluido
+        easing_factor = 0.2
+        self.current_value += (target_value - self.current_value) * easing_factor
 
-        # Soglia minima per evitare oscillazioni
-        dead_zone = 0.5  # Tolleranza per fermare l'aggiornamento
-
-        # Determina se avanzare o retrocedere
-        if abs(self.current_value - target_value) <= dead_zone:
-            self.current_value = target_value
-            self.draw_needle(self.current_value)
-            return  # Ferma l'aggiornamento se è nella zona morta
-
-        if target_value > self.current_value:
-            # Movimento rapido in avanti
-            self.current_value = min(self.current_value + step_forward, target_value)
-        elif target_value < self.current_value:
-            # Movimento lento indietro
-            self.current_value = max(self.current_value - step_backward, target_value)
-
-        # Disegna la lancetta con il nuovo valore corrente
+        # Disegna la lancetta
         self.draw_needle(self.current_value)
 
-        # Richiama se stesso finché il target non viene raggiunto
+        # Ferma l'aggiornamento se la differenza è troppo piccola
+        if abs(self.current_value - target_value) < 0.5:
+            self.current_value = target_value
+            self.draw_needle(self.current_value)
+            return
+
+        # Continua l'animazione
         self.after(10, self.smooth_update_needle, target_value)
+
+
+        # Aggiorna la posizione della lancetta
+        step = 10.0 if target_value > self.current_value else -1.0
+        self.current_value += step
+        if (step > 0 and self.current_value > target_value) or (step < 0 and self.current_value < target_value):
+            self.current_value = target_value
+
+        self.draw_needle(self.current_value)
+
+        # Richiama se stesso per un aggiornamento graduale
+        self.after(10, self.smooth_update_needle, target_value)
+
 
 
 
